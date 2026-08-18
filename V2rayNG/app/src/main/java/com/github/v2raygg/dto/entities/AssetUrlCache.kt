@@ -1,0 +1,6 @@
+package com.github.v2raygg.dto.entities
+
+data class AssetUrlCache(
+    val guid: String,
+    val assetUrl: AssetUrlItem
+)
