@@ -2,11 +2,8 @@ package com.github.v2raygg.ui
 
 import android.content.Intent
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import android.view.MenuItem
 import com.github.v2raygg.AppConfig
 import com.github.v2raygg.R
@@ -25,11 +22,6 @@ class ScannerActivity : HelperBaseActivity() {
 
     private val scanQrCode = registerForActivityResult(ScanCustomCode(), ::handleResult)
 
-    private val pickPhotoLauncher = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) {
-            decodeQRCodeFromUri(uri)
-        }
-    }
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -78,7 +70,7 @@ class ScannerActivity : HelperBaseActivity() {
         }
 
         R.id.select_photo -> {
-            pickPhotoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            showFileChooser()
             true
         }
 
@@ -86,21 +78,26 @@ class ScannerActivity : HelperBaseActivity() {
         else -> super.onOptionsItemSelected(item)
     }
 
-    private fun decodeQRCodeFromUri(uri: Uri) {
-        try {
-            val inputStream = contentResolver.openInputStream(uri)
-            val bitmap = BitmapFactory.decodeStream(inputStream)
-            inputStream?.close()
-
-            val text = QRCodeDecoder.syncDecodeQRCode(bitmap)
-            if (text.isNullOrEmpty()) {
-                toast(R.string.toast_decoding_failed)
-            } else {
-                finished(text)
+    private fun showFileChooser() {
+        launchFileChooser("image/*") { uri ->
+            if (uri == null) {
+                return@launchFileChooser
             }
-        } catch (e: Exception) {
-            LogUtil.e(AppConfig.TAG, "Failed to decode QR code from file", e)
-            toast(R.string.toast_decoding_failed)
+            try {
+                val inputStream = contentResolver.openInputStream(uri)
+                val bitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
+
+                val text = QRCodeDecoder.syncDecodeQRCode(bitmap)
+                if (text.isNullOrEmpty()) {
+                    toast(R.string.toast_decoding_failed)
+                } else {
+                    finished(text)
+                }
+            } catch (e: Exception) {
+                LogUtil.e(AppConfig.TAG, "Failed to decode QR code from file", e)
+                toast(R.string.toast_decoding_failed)
+            }
         }
     }
 }
