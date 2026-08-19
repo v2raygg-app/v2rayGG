@@ -2,9 +2,12 @@ package com.github.v2raygg.ui
 
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import com.github.v2raygg.AppConfig
 import com.github.v2raygg.R
 import com.github.v2raygg.databinding.ActivityNoneBinding
@@ -21,6 +24,15 @@ class ScannerActivity : HelperBaseActivity() {
     private val binding by lazy { ActivityNoneBinding.inflate(layoutInflater) }
 
     private val scanQrCode = registerForActivityResult(ScanCustomCode(), ::handleResult)
+
+    // PickVisualMedia uses the Android Photo Picker when available and a system
+    // picker fallback on older Android versions. It does not require storage
+    // permissions.
+    private val pickPhotoLauncher = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let(::decodeQRCodeFromUri)
+    }
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,34 +82,29 @@ class ScannerActivity : HelperBaseActivity() {
         }
 
         R.id.select_photo -> {
-            showFileChooser()
+            pickPhotoLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+            )
             true
         }
-
 
         else -> super.onOptionsItemSelected(item)
     }
 
-    private fun showFileChooser() {
-        launchFileChooser("image/*") { uri ->
-            if (uri == null) {
-                return@launchFileChooser
+    private fun decodeQRCodeFromUri(uri: Uri) {
+        try {
+            val bitmap = contentResolver.openInputStream(uri).use { input ->
+                BitmapFactory.decodeStream(input)
             }
-            try {
-                val inputStream = contentResolver.openInputStream(uri)
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                inputStream?.close()
-
-                val text = QRCodeDecoder.syncDecodeQRCode(bitmap)
-                if (text.isNullOrEmpty()) {
-                    toast(R.string.toast_decoding_failed)
-                } else {
-                    finished(text)
-                }
-            } catch (e: Exception) {
-                LogUtil.e(AppConfig.TAG, "Failed to decode QR code from file", e)
+            val text = bitmap?.let(QRCodeDecoder::syncDecodeQRCode)
+            if (text.isNullOrEmpty()) {
                 toast(R.string.toast_decoding_failed)
+            } else {
+                finished(text)
             }
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "Failed to decode QR code from file", e)
+            toast(R.string.toast_decoding_failed)
         }
     }
 }
